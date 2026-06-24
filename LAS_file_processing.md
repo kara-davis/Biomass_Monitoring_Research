@@ -12,3 +12,6 @@
 7. Create LAS Dataset for each file
 8. Extract LAS Dataset to crop dataset to smaller region
 9. For the Ground Points file: LAS Dataset to Raster
+10. Create Digital Surface Model
+11. Create Canopy Height Model by using Raster Calculator to DSM - DTM
+12. 
