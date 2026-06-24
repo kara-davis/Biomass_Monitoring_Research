@@ -8,4 +8,7 @@
    * Classification Threshold: 0.5
 4. Save and Export Ground Points
 5. Open Ground Points and original LAS file in ArcGIS
-6. ------ insert further instructions
+#### The following steps are further Outlined in the LiDAR Workflow File
+7. Create LAS Dataset for each file
+8. Extract LAS Dataset to crop dataset to smaller region
+9. For the Ground Points file: LAS Dataset to Raster
