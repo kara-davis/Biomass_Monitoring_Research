@@ -1,0 +1,247 @@
+import h5py
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import Point
+import os
+import datetime
+import tkinter as tk
+from tkinter import filedialog, simpledialog
+
+# ── Step 1: Prompt for data folder, file header, and GDB boundary ─────────────
+print("Opening dialogs — check your taskbar if they don't appear on top.\n")
+
+root = tk.Tk()
+root.withdraw()
+root.attributes('-topmost', True)
+
+# 1a. Select the data folder (where .h5 files live and outputs will be saved)
+data_folder = filedialog.askdirectory(title="Select your data folder (where .h5 files are stored)")
+if not data_folder:
+    raise SystemExit("No data folder selected. Exiting.")
+print(f"Data folder: {data_folder}")
+
+# 1b. Ask for the file name header
+file_header = simpledialog.askstring(
+    "File name header",
+    "Enter a short header for all output file names\n(e.g. 'bpines' → bpines_gedi_shots.csv):",
+    parent=root
+)
+if not file_header:
+    raise SystemExit("No file header entered. Exiting.")
+file_header = file_header.strip().lower().replace(" ", "_")  # sanitise input
+print(f"File header: {file_header}")
+
+# Build output paths from the header
+csv_path             = os.path.join(data_folder, f'{file_header}_gedi_shots.csv')
+geojson_path         = os.path.join(data_folder, f'{file_header}_gedi_shots.geojson')
+buffer_geojson_path  = os.path.join(data_folder, f'{file_header}_gedi_footprints.geojson')
+
+print(f"\nOutput files will be:")
+print(f"  {csv_path}")
+print(f"  {geojson_path}")
+print(f"  {buffer_geojson_path}\n")
+
+# 1c. Select the boundary GDB
+gdb_path = filedialog.askdirectory(title="Select your .gdb folder (boundary for ROI)")
+
+if not gdb_path:
+    raise SystemExit("No .gdb folder selected. Exiting.")
+
+# List available layers
+import fiona
+layers = fiona.listlayers(gdb_path)
+print("\nLayers found in geodatabase:")
+for i, layer in enumerate(layers):
+    print(f"  {i + 1}: {layer}")
+
+# Ask user to pick a layer
+layer_index = simpledialog.askinteger(
+    "Select Layer",
+    f"Enter the number of the layer to use (1–{len(layers)}):",
+    minvalue=1,
+    maxvalue=len(layers)
+)
+root.destroy()
+
+if layer_index is None:
+    raise SystemExit("No layer selected. Exiting.")
+
+layer_name = layers[layer_index - 1]
+print(f"\nUsing layer: {layer_name}")
+
+# Load the boundary layer and compute bounding box
+boundary = gpd.read_file(gdb_path, layer=layer_name)
+boundary_wgs84 = boundary.to_crs("EPSG:4326")  # Ensure WGS84 lat/lon
+
+minx, miny, maxx, maxy = boundary_wgs84.total_bounds
+LON_MIN, LAT_MIN, LON_MAX, LAT_MAX = minx, miny, maxx, maxy
+
+print(f"Bounding box: Lat [{LAT_MIN:.6f}, {LAT_MAX:.6f}] | Lon [{LON_MIN:.6f}, {LON_MAX:.6f}]")
+
+# ── Step 2: Load existing data if it exists ───────────────────────────────────
+if os.path.exists(csv_path):
+    existing = pd.read_csv(csv_path)
+    existing_shots = set(existing['shot_number'].astype(str))
+    print(f'\nLoaded {len(existing)} existing shots from CSV')
+else:
+    existing = pd.DataFrame()
+    existing_shots = set()
+    print('\nNo existing CSV found — starting fresh')
+
+# ── Step 3: Process each .h5 file ─────────────────────────────────────────────
+all_shots = []
+
+h5_files = [f for f in os.listdir(data_folder) if f.endswith('.h5')]
+print(f'Found {len(h5_files)} .h5 files to process')
+
+for filename in h5_files:
+    filepath = os.path.join(data_folder, filename)
+    print(f'\nProcessing: {filename}')
+
+    try:
+        with h5py.File(filepath, 'r') as f:
+            beams = [k for k in f.keys() if k.startswith('BEAM')]
+
+            for beam in beams:
+                try:
+                    lat = f[beam]['lat_lowestmode'][:]
+                    lon = f[beam]['lon_lowestmode'][:]
+
+                    mask = (
+                        (lat >= LAT_MIN) & (lat <= LAT_MAX) &
+                        (lon >= LON_MIN) & (lon <= LON_MAX)
+                    )
+
+                    if mask.sum() == 0:
+                        continue
+
+                    print(f'  {beam}: {mask.sum()} shots in ROI')
+
+                    rh = f[beam]['rh'][mask]
+
+                    # Date from filename
+                    try:
+                        year = int(filename[9:13])
+                        doy  = int(filename[13:16])
+                        date = datetime.datetime(year, 1, 1) + datetime.timedelta(doy - 1)
+                        date_str = date.strftime('%Y-%m-%d')
+                    except Exception:
+                        date_str = 'unknown'
+
+                    shot_numbers = f[beam]['shot_number'][mask].astype(str)
+
+                    # Skip shots already in existing CSV
+                    new_mask = np.array([s not in existing_shots for s in shot_numbers])
+                    if new_mask.sum() == 0:
+                        print(f'  All shots already processed, skipping')
+                        continue
+
+                    print(f'  {new_mask.sum()} new shots to add')
+
+                    shot_data = {
+                        'filename':     filename,
+                        'beam':         beam,
+                        'date':         date_str,
+                        'lat':          lat[mask][new_mask],
+                        'lon':          lon[mask][new_mask],
+                        # RH metrics — indices match percentile directly
+                        'rh25':         rh[:, 25][new_mask],
+                        'rh50':         rh[:, 50][new_mask],
+                        'rh75':         rh[:, 75][new_mask],
+                        'rh95':         rh[:, 95][new_mask],   # added
+                        'rh98':         rh[:, 98][new_mask],
+                        'rh99':         rh[:, 99][new_mask],   # added
+                        'rh100':        rh[:, 100][new_mask],  # added
+                        'sensitivity':  f[beam]['sensitivity'][mask][new_mask],
+                        'quality_flag': f[beam]['quality_flag'][mask][new_mask],
+                        'degrade_flag': f[beam]['degrade_flag'][mask][new_mask],
+                        'shot_number':  shot_numbers[new_mask],
+                    }
+
+                    all_shots.append(pd.DataFrame(shot_data))
+
+                except KeyError as e:
+                    print(f'  Skipping {beam} — missing field: {e}')
+                    continue
+
+    except Exception as e:
+        print(f'Error reading {filename}: {e}')
+        continue
+
+# ── Step 4: Combine new + existing shots ──────────────────────────────────────
+if len(all_shots) == 0:
+    print('\nNo new shots found in ROI')
+    combined_quality = existing[
+        (existing['quality_flag'] == 1) &
+        (existing['degrade_flag'] == 0)
+    ].copy() if len(existing) > 0 else pd.DataFrame()
+else:
+    new_shots = pd.concat(all_shots, ignore_index=True)
+    print(f'\nNew shots found: {len(new_shots)}')
+
+    combined = pd.concat([existing, new_shots], ignore_index=True)
+    combined.drop_duplicates(subset='shot_number', inplace=True)
+    print(f'Total shots (all): {len(combined)}')
+
+    combined_quality = combined[
+        (combined['quality_flag'] == 1) &
+        (combined['degrade_flag'] == 0)
+    ].copy()
+    print(f'Total high-quality shots: {len(combined_quality)}')
+
+    # Ensure shot_number stays as string (ArcGIS Pro compatibility)
+    combined_quality['shot_number'] = combined_quality['shot_number'].astype(str)
+
+    # Save updated CSV
+    combined_quality.to_csv(csv_path, index=False)
+    print(f'CSV saved: {csv_path}')
+
+# ── Step 5: Build point GeoDataFrame ──────────────────────────────────────────
+if len(combined_quality) == 0:
+    print('No quality shots to export. Exiting.')
+    raise SystemExit()
+
+geometry_pts = [Point(lon, lat) for lon, lat in zip(combined_quality['lon'], combined_quality['lat'])]
+gdf_points = gpd.GeoDataFrame(combined_quality, geometry=geometry_pts, crs='EPSG:4326')
+
+# Save point GeoJSON
+gdf_points.to_file(geojson_path, driver='GeoJSON')
+print(f'Point GeoJSON saved: {geojson_path}')
+
+# ── Step 6: Create 25 m footprint buffers ────────────────────────────────────
+#
+# WHY WE REPROJECT:
+#   GEDI points are stored in WGS84 (EPSG:4326), where coordinates are in
+#   degrees. Buffering in degrees does NOT give you metres — 0.0001° of
+#   longitude is ~9 m near the equator but changes with latitude.
+#
+#   Solution: reproject to a CRS measured in metres, buffer by exactly
+#   12.5 m (radius), then reproject back to WGS84.
+#
+#   UTM Zone 10N (EPSG:32610) covers central California and is appropriate
+#   for this study area. Adjust the EPSG code if your ROI is in a different
+#   UTM zone.
+#
+# WHAT THE BUFFER DOES:
+#   Each GEDI shot records a single lat/lon centre point, but the real
+#   laser footprint illuminates a ~25 m diameter circle on the ground.
+#   buffer(12.5) expands each point into a circle with radius 12.5 m,
+#   giving a 25 m diameter polygon that matches the physical footprint.
+#   When you later extract biomass, canopy height, or image pixel values
+#   WITHIN these polygons, you are sampling the same area the lidar saw.
+
+UTM_CRS = 'EPSG:32610'   # UTM Zone 10N — change if your site is elsewhere
+
+gdf_utm = gdf_points.to_crs(UTM_CRS)
+gdf_utm['geometry'] = gdf_utm.geometry.buffer(12.5)    # 12.5 m radius → 25 m diameter
+gdf_footprints = gdf_utm.to_crs('EPSG:4326')           # reproject back to WGS84
+
+gdf_footprints.to_file(buffer_geojson_path, driver='GeoJSON')
+print(f'Footprint GeoJSON saved (25 m buffers): {buffer_geojson_path}')
+
+print('\nDone! Safe to delete .h5 files and download next batch.')
+print('Outputs:')
+print(f'  Points    → {geojson_path}')
+print(f'  Footprints → {buffer_geojson_path}')
+print(f'  CSV        → {csv_path}')
