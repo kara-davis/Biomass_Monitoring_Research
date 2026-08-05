@@ -11,8 +11,8 @@ library(tidyterra)
 library(patchwork)
 library(scales)
 
-base_path <- "C:/Users/kdavis99/OneDrive - Cal Poly/Tree Biomass Estimation Research - Documents/GitHub_Repository"
-
+base_path <- "C:/Users/davisk10/OneDrive - Cal Poly/Tree Biomass Estimation Research - Documents/GitHub_Repository/Rasters"
+out_path  <- "C:/Users/davisk10/OneDrive - Cal Poly/Tree Biomass Estimation Research - Documents/CODE/R code/Output Files"
 
 # Clip all rasters to arboretum boundary
 boundary <- vect(file.path(base_path, "boundary.shp"))
@@ -25,12 +25,29 @@ for (f in c("ogdsm1.tif", "dsm1.tif", "dsm04.tif",
   writeRaster(r, file.path(base_path, f), overwrite = TRUE, NAflag = -9999)
   cat(sprintf("Clipped %s\n", f))
 }
-output_dpi <- 300
+
+output_dpi <- 600
 
 # ── Colour palettes ───────────────────────────────────────────────────────────
 chm_colours <- c("#1a6b1a", "#4aab1a", "#a8d400", "#ffff00", "#ffaa00", "#ff5500", "#cc0000")
 dsm_colours <- c("#2166ac", "#4dac26", "#b8e186", "#f7f7f7", "#f1b6da", "#d01c8b", "#7b3294")
 dtm_colours <- c("#543005", "#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#35978f")
+
+# ── Safe save helper ──────────────────────────────────────────────────────────
+safe_save <- function(filename, plot, width, height, dpi, bg) {
+  if (file.exists(filename)) {
+    file.remove(filename)
+    cat(sprintf("  Removed existing: %s\n", basename(filename)))
+  }
+  ggsave(filename, plot = plot, width = width, height = height,
+         dpi = dpi, bg = bg, limitsize = FALSE)
+  if (file.exists(filename)) {
+    cat(sprintf("  ✓ Saved: %s (%.1f KB)\n", basename(filename),
+                file.size(filename) / 1024))
+  } else {
+    cat(sprintf("  ✗ FAILED: %s\n", basename(filename)))
+  }
+}
 
 # ── Read & clean ──────────────────────────────────────────────────────────────
 read_and_clean <- function(path) {
@@ -74,7 +91,7 @@ base_theme <- theme_minimal(base_size = 10) +
   )
 
 make_panel <- function(r, label, tag_letter, palette, vmin, vmax) {
-  max_cells <- 1200 * 1200
+  max_cells <- 3000 * 3000
   if (ncell(r) > max_cells) {
     fact <- ceiling(sqrt(ncell(r) / max_cells))
     r <- aggregate(r, fact = fact, fun = "mean", na.rm = TRUE)
@@ -90,38 +107,38 @@ make_panel <- function(r, label, tag_letter, palette, vmin, vmax) {
     ) +
     labs(title = label, tag = tag_letter) +
     guides(fill = guide_colorbar(title.position = "top", title.hjust = 0.5,
-                                  ticks = TRUE, ticks.colour = subtle,
-                                  frame.colour = spine_col)) +
+                                 ticks = TRUE, ticks.colour = subtle,
+                                 frame.colour = spine_col)) +
     base_theme
 }
 
 # ── Generic function to build & save a 3-panel comparison ────────────────────
 make_comparison <- function(file_arc, file_r1, file_r04,
-                             label_arc, label_r1, label_r04,
-                             figure_title, palette,
-                             out_combined, out_a, out_b, out_c,
-                             legend_title = "Elevation (m)") {
-
+                            label_arc, label_r1, label_r04,
+                            figure_title, palette,
+                            out_combined, out_a, out_b, out_c,
+                            legend_title = "Elevation (m)") {
+  
   cat(sprintf("\n\n══ %s ══\n", figure_title))
   rasts <- lapply(c(file_arc, file_r1, file_r04), read_and_clean)
-
+  
   vmin <- min(sapply(rasts, function(r) global(r, "min", na.rm = TRUE)[[1]]))
   vmax <- max(sapply(rasts, function(r) global(r, "max", na.rm = TRUE)[[1]]))
   cat(sprintf("Shared scale: %.1f – %.1f m\n", vmin, vmax))
-
+  
   panels <- mapply(make_panel,
                    r          = rasts,
                    label      = c(label_arc, label_r1, label_r04),
                    tag_letter = c("A", "B", "C"),
                    MoreArgs   = list(palette = palette, vmin = vmin, vmax = vmax),
                    SIMPLIFY   = FALSE)
-
+  
   for (i in 1:3) {
     fname <- c(out_a, out_b, out_c)[i]
-    ggsave(fname, plot = panels[[i]], width = 6, height = 6, dpi = output_dpi, bg = bg_col)
-    cat(sprintf("✓  Panel %s → %s\n", LETTERS[i], normalizePath(fname, mustWork = FALSE)))
+    safe_save(fname, panels[[i]], width = 10, height = 10,
+              dpi = output_dpi, bg = bg_col)
   }
-
+  
   combined <- (panels[[1]] | panels[[2]] | panels[[3]]) +
     plot_annotation(
       title   = figure_title,
@@ -134,9 +151,9 @@ make_comparison <- function(file_arc, file_r1, file_r04,
                                        hjust = 0.5, margin = margin(t = 4, b = 4))
       )
     )
-
-  ggsave(out_combined, plot = combined, width = 16, height = 6, dpi = output_dpi, bg = bg_col)
-  cat(sprintf("✓  Combined → %s\n", normalizePath(out_combined, mustWork = FALSE))) # nolint: line_length_linter.
+  
+  safe_save(out_combined, combined, width = 28, height = 10,
+            dpi = output_dpi, bg = bg_col)
 }
 
 # ── DSM comparison ────────────────────────────────────────────────────────────
@@ -149,8 +166,10 @@ make_comparison(
   label_r04 = "R Developed DSM (0.4m)",
   figure_title = "Digital Surface Model Comparison",
   palette      = dsm_colours,
-  out_combined = "DSM_comparison_figure.png",
-  out_a = "DSM_panel_A.png", out_b = "DSM_panel_B.png", out_c = "DSM_panel_C.png"
+  out_combined = file.path(out_path, "DSM_comparison_figure.png"),
+  out_a = file.path(out_path, "DSM_panel_A.png"),
+  out_b = file.path(out_path, "DSM_panel_B.png"),
+  out_c = file.path(out_path, "DSM_panel_C.png")
 )
 
 # ── DTM comparison ────────────────────────────────────────────────────────────
@@ -163,8 +182,10 @@ make_comparison(
   label_r04 = "R Developed DTM (0.4m)",
   figure_title = "Digital Terrain Model Comparison",
   palette      = dtm_colours,
-  out_combined = "DTM_comparison_figure.png",
-  out_a = "DTM_panel_A.png", out_b = "DTM_panel_B.png", out_c = "DTM_panel_C.png"
+  out_combined = file.path(out_path, "DTM_comparison_figure.png"),
+  out_a = file.path(out_path, "DTM_panel_A.png"),
+  out_b = file.path(out_path, "DTM_panel_B.png"),
+  out_c = file.path(out_path, "DTM_panel_C.png")
 )
 
 # ── CHM comparison ────────────────────────────────────────────────────────────
@@ -177,8 +198,10 @@ make_comparison(
   label_r04 = "R Developed CHM (0.4m)",
   figure_title = "Canopy Height Model Comparison",
   palette      = chm_colours,
-  out_combined = "CHM_comparison_figure.png",
-  out_a = "CHM_panel_A.png", out_b = "CHM_panel_B.png", out_c = "CHM_panel_C.png"
+  out_combined = file.path(out_path, "CHM_comparison_figure.png"),
+  out_a = file.path(out_path, "CHM_panel_A.png"),
+  out_b = file.path(out_path, "CHM_panel_B.png"),
+  out_c = file.path(out_path, "CHM_panel_C.png")
 )
 
 cat("\n\nAll done!\n")
