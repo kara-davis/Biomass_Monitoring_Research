@@ -1,6 +1,14 @@
 # Biomass_Monitoring_Research
 This repository contains code and information regarding using and processing LiDAR data from GEDI and UAVs.
 
+## Repo layout
+- `notebooks/` — Jupyter notebooks (GEDI footprint processing, LAS→CHM workflow, UAV→biomass segmentation)
+- `scripts/` — standalone Python/R scripts (GEDI processing, segmentation comparison, raster plotting)
+- `Parameter_Sweep_Analysis/` — self-contained tree-segmentation parameter sweep (scripts + summary outputs)
+- `data/` — source data tracked in git (e.g. `WorkingTrees_Arboretum_Data.xlsx`)
+- `outputs/` — generated results (CSVs, GeoPackages, comparison workbooks/HTML); gitignored, regenerate via the notebooks/scripts above
+- `docs/` — supporting documentation (LiDAR workflow writeup, Ouster processing notes)
+
 ## Future Edits to be Made: (Reference NASA CoLab Notebook)
   * Pull corresponding waveforms of the footprints
   * Print reference map

@@ -1,0 +1,20 @@
+# Generated/regenerated pipeline outputs (see scripts/ and notebooks/)
+/outputs/*
+!/outputs/README.md
+Parameter_Sweep_Analysis/sweep_outputs/
+Parameter_Sweep_Analysis/sweep_outputs_025m/
+Parameter_Sweep_Analysis/sweep_results_summary*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor / local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
