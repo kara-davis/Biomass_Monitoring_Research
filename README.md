@@ -16,3 +16,5 @@ This repository contains code and information regarding using and processing LiD
   * Create universal variable names that can be easily updated at top of file to allow for new AOI's to be run more easily
 <img width="1286" height="856" alt="image" src="https://github.com/user-attachments/assets/a918ae6d-bd42-4791-a2de-b6659aca8784" />
 <img width="1286" height="859" alt="image" src="https://github.com/user-attachments/assets/130a70e7-db4f-455d-8e33-3cca5a80fa89" />
+<img width="1073" height="565" alt="image" src="https://github.com/user-attachments/assets/05c8c4f4-1a54-484b-be54-ecb0dae56202" />
+
