@@ -98,15 +98,13 @@ plot_overseg_window <- function(chm, polys, ttops, suspect_pairs, window, title 
 
 # Load surveyed trees, drop rows without a height and non-orchard "test" rows
 # (wind turbine / tall eucalyptus etc.), and reproject to the CHM CRS.
-read_ground_trees <- function(path, crs_target, sheet = "Left_Join",
-                              height_col = "app_ground_truth_ht_m") {
-  g <- readxl::read_excel(path, sheet = sheet, .name_repair = "minimal")
-  g <- g[!is.na(g$ground_x) & !is.na(g[[height_col]]), ]            # needs ground coords + height
-  g <- st_as_sf(g, coords = c("ground_x", "ground_y"), crs = 4326) |> st_transform(crs_target)
-  g$Tree_Label  <- g$tree_label
-  g$GT_DBH      <- g$`app_ground_truth_dbh_m` * 100                      # m to cm conversion
+read_ground_trees <- function(path, crs_target, height_col = "GT HEIGHT") {
+  g <- readxl::read_excel(path, sheet = 1, .name_repair = "minimal")
+  g <- g[!is.na(g$esrignss_longitude) & !is.na(g$esrignss_latitude) & !is.na(g[[height_col]]), ]            # needs ground coords + height
+  g <- st_as_sf(g, coords = c("esrignss_longitude", "esrignss_latitude"), crs = 4326) |> st_transform(crs_target)
+  g$GT_DBH      <- g$`GT Dt` * 100                      # m to cm conversion
   g$gt_height_m <- g[[height_col]]
-  g[!grepl("test", tolower(paste(g$tree_label, g$app_notes))), ]
+  g[!grepl("test", tolower(paste(g$Tree_Label, g$notes))), ]
 }
 
 # One-to-one nearest-neighbour matching (closest pairs first) within max_dist.
