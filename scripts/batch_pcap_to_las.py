@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-folder = Path(r"D:\OusterData\Bartleson\Raw_Bartleson_Files_10_13_2026")
+folder = Path(r"D:\OusterData\Arboretum\Raw_Arb_Files_10_27_2026")
 ouster_cli = r"C:\Users\kdavis99\AppData\Roaming\Python\Python313\Scripts\ouster-cli.exe"
 min_range = "1.25m"   # clips returns closer than this to the sensor
 
