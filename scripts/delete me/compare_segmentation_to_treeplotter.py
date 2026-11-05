@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 from pyproj import Transformer
 
-REPO_DIR = Path(__file__).resolve().parent.parent
+REPO_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = REPO_DIR / "data"
 OUTPUT_DIR = REPO_DIR / "outputs"
 

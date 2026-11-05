@@ -30,7 +30,7 @@ from pyproj import Transformer
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.dirname(SCRIPT_DIR)
-ARBORETUM_XLSX = f"{REPO_DIR}\\WorkingTrees_Arboretum_Data.xlsx"
+ARBORETUM_XLSX = f"{REPO_DIR}\\data\\WorkingTrees_Arboretum_Data.xlsx"
 BIOMASS_SHEET = "Biomass Calcs"
 TREEPLOTTER_SHEET = "TreePlotter Data"
 

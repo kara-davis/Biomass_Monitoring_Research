@@ -13,7 +13,7 @@ smooth_k   <- 3
 pad        <- 8
 fp_rename  <- c("9" = 1, "10" = 2, "8" = 3, "7" = 4, "6" = 5, "5" = 6, "11" = 7, "12" = 8, "3" = 9, "4" = 10)   # old footprint label -> new title number
 
-seg_dir <- "../outputs/Bartleson Tree Segmentation"
+seg_dir <- "../outputs/Bartleson 50cm Tree Segmentation"
 dir_dal <- file.path(seg_dir, paste0("dalponte_",  res))
 dir_ws  <- file.path(seg_dir, paste0("watershed_", res))
 
