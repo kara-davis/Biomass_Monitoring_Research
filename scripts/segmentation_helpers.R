@@ -107,13 +107,18 @@ read_ground_trees <- function(path, crs_target, height_col = "GT HEIGHT") {
   g[!grepl("test", tolower(paste(g$Tree_Label, g$notes))), ]
 }
 
-# One-to-one nearest-neighbour matching (closest pairs first) within max_dist.
+# One-to-one matching (closest pairs first) within max_dist of the CROWN outline.
+# Pairs are ranked by distance from the surveyed point to the crown polygon (0 if inside),
+# ties broken by distance to the treetop; dist_m reported is the treetop distance.
 # Segmented height is reported two ways: treetop height from the SMOOTHED CHM, and the
 # maximum RAW-CHM value inside the matched crown (smoothing lowers peaks).
 match_ground_trees <- function(ground, ttops, polys, chm_raw, max_dist = 2.5) {
   d <- st_distance(ground, ttops); d <- matrix(as.numeric(d), nrow = nrow(ground))
-  cand <- which(d <= max_dist, arr.ind = TRUE)
-  cand <- cand[order(d[cand]), , drop = FALSE]
+  dc <- matrix(Inf, nrow(ground), nrow(ttops))                      # distance to crown polygon
+  pidx <- match(ttops$treeID, polys$treeID); has <- !is.na(pidx)
+  dc[, has] <- matrix(as.numeric(st_distance(ground, polys[pidx[has], ])), nrow = nrow(ground))
+  cand <- which(dc <= max_dist, arr.ind = TRUE)
+  cand <- cand[order(dc[cand], d[cand]), , drop = FALSE]
   g_used <- rep(FALSE, nrow(ground)); t_used <- rep(FALSE, nrow(ttops)); keep <- integer(0)
   for (k in seq_len(nrow(cand))) {
     i <- cand[k, 1]; j <- cand[k, 2]
