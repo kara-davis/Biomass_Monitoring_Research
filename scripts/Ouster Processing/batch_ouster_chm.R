@@ -6,10 +6,10 @@ library(lidR)
 base_dir    <- "C:/Users/davisk10/OneDrive - Cal Poly/Tree Biomass Estimation Research - Documents/Bartleson Ranch"
 clips_dir   <- file.path(base_dir, "Ouster Backpack Final Files", "clips")
 polys_path  <- file.path(base_dir, "6423_selected_footprints.gpkg")
-rasters_dir <- file.path(base_dir, "Rasters_new")  # new folder so existing Rasters/ stay untouched
+rasters_dir <- file.path(base_dir, "Rasters")  # finished footprints are skipped on rerun, so delete a footprint's folder to redo it
 
 res_m    <- 0.25   # DTM and CHM pixel size (m)
-max_z    <- 6      # drop points above this height (m); trees here are <= ~5 m
+max_z    <- Inf    # drop points above this height (m); Inf = no cap (noise already removed). Was 6; fall back to 20 if stray high points show up
 polys    <- st_make_valid(st_read(polys_path, quiet = TRUE))
 
 files <- list.files(clips_dir, pattern = "^O\\d+_clip\\.las$", full.names = TRUE)
