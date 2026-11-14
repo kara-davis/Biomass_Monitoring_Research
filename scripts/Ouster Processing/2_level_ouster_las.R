@@ -1,6 +1,6 @@
 library(lidR)
 
-f <- "D:\\OusterData\\Bartleson\\Raw_Bartleson_Files_10_13_2026\\125cm_min_range_O10_20261013_1335_03.las"
+f <- "D:\\OusterData\\Tomorro BDA\\Tomorro_clean_2026_11_4_06.las"
 las <- suppressWarnings(readTLSLAS(f))
 
 xyz <- as.matrix(las@data[, c("X", "Y", "Z")])
